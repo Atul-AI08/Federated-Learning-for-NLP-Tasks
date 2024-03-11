@@ -22,9 +22,9 @@ def get_args():
     parser.add_argument("--partition", type=str, default="noniid", help="the data partitioning strategy")
     parser.add_argument("--batch_size", type=int, default=64, help="total sum of input batch size for training (default: 128)")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate (default: 0.001)")
-    parser.add_argument("--epochs", type=int, default=5, help="number of local epochs")
-    parser.add_argument("--n_parties", type=int, default=10, help="number of workers in a distributed cluster")
-    parser.add_argument("--comm_round", type=int, default=10, help="number of maximum communication roun")
+    parser.add_argument("--epochs", type=int, default=3, help="number of local epochs")
+    parser.add_argument("--n_parties", type=int, default=2, help="number of workers in a distributed cluster")
+    parser.add_argument("--comm_round", type=int, default=2, help="number of maximum communication roun")
     parser.add_argument("--init_seed", type=int, default=0, help="Random seed")
     parser.add_argument("--traindir", type=str, required=False, default="./data/train.csv", help="Data directory")
     parser.add_argument("--testdir", type=str, required=False, default="./data/test.csv", help="Data directory")
@@ -138,7 +138,6 @@ def local_train_net(
 
 if __name__ == "__main__":
     vocab_size=195675
-    embedding_dim=768
     out_dim=2
 
     args = get_args()
@@ -187,8 +186,8 @@ if __name__ == "__main__":
 
     # Initializing net from each local party.
     print("Initializing nets")
-    nets, local_model_meta_data, layer_type = init_nets(embedding_dim, out_dim, vocab_size, args.n_parties, args, device="cpu")
-    global_models, global_model_meta_data, global_layer_type = init_nets(embedding_dim, out_dim, vocab_size, 1, args, device="cpu")
+    nets, local_model_meta_data, layer_type = init_nets(out_dim, args.vocab, vocab_size, args.n_parties, args, device="cpu")
+    global_models, global_model_meta_data, global_layer_type = init_nets(out_dim, args.vocab, vocab_size, 1, args, device="cpu")
 
     global_model = global_models[0]
     n_comm_rounds = args.comm_round
