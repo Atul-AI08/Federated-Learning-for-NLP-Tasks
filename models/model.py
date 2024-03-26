@@ -1,12 +1,14 @@
+# Description: This file contains the model definition for the Sentiment Analysis model.
+
 import torch
 import json
 import torch.nn as nn
 import numpy as np
 from gensim.models import KeyedVectors
-import os
 
 GOOGLE_W2V = "./models/GoogleNews-vectors-negative300.bin"
 
+# Define the SentimentAnalyzer class
 class SentimentAnalyzer(nn.Module):
     """A LSTM based model 
 
@@ -44,7 +46,7 @@ class SentimentAnalyzer(nn.Module):
         _,(hn,_) = self.lstm(embeds)
         return self.fc(hn[-1])
     
-
+# Function to embed the vocabulary
 def embed_vocab(vocab_file, vocab_size, embedding_dim):
     with open(vocab_file,'r') as f:
         word2idx = json.load(f)
@@ -56,18 +58,11 @@ def embed_vocab(vocab_file, vocab_size, embedding_dim):
             embedding_matrix[i] = word2vec[word]
     return torch.tensor(embedding_matrix, dtype = torch.float)
 
-
-def init_nets(out_dim, vocab_file, vocab_size, n_parties, args, device="cpu"):
+# Function to initialize the nets
+def init_nets(out_dim, vocab_file, vocab_size, n_parties, args):
     nets = {net_i: None for net_i in range(n_parties)}
     for net_i in range(n_parties):
         net = SentimentAnalyzer(vocab_file, vocab_size, out_dim, args.hidden_dim, 1)
-        # net = net.cuda()
         nets[net_i] = net
 
-    model_meta_data = []
-    layer_type = []
-    for (k, v) in nets[0].state_dict().items():
-        model_meta_data.append(v.shape)
-        layer_type.append(k)
-
-    return nets, model_meta_data, layer_type
+    return nets

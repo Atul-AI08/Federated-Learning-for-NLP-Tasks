@@ -27,6 +27,8 @@ negations_dict = {
             "mustn't":"must not"
             }
 
+# Functions for text preprocessing
+
 def convert_to_lower(text):
     return text.lower()
 
@@ -53,7 +55,7 @@ def clean_text(text):
     
     return text
 
-
+# Function to load data
 def load_data(csv_path, min_tweets = 20):
     columns = ["target", "ids", "date", "flag", "user", "text"]
     data = pd.read_csv(csv_path, encoding = "ISO-8859-1", header = None, names = columns)

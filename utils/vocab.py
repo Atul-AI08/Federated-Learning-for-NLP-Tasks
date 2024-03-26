@@ -24,12 +24,6 @@ class Vocabulary:
         frequencies = Counter()
         start_idx = len(self.idx2str)
         for sentence in tqdm(sentence_list,desc="Building vocabulary",total=len(sentence_list)):
-            # for word in self.tokenizer_eng(sentence):
-            #     frequencies[word] += 1
-            #     if frequencies[word]==self.freq_threshold:
-            #         self.str2idx[word] = start_idx 
-            #         self.idx2str[start_idx] = word
-            #         idx += 1
             frequencies.update(Counter(self.tokenizer_eng(sentence)))
         updated = (word for word,count in frequencies.items() if count>=self.freq_threshold)
   

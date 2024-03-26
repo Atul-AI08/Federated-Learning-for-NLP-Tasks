@@ -1,20 +1,19 @@
 """ 
-Utility functions to load, save, log, and process data.
-
-Some of the codes in this file are excerpted from the original work
-https://github.com/QinbinLi/MOON/blob/main/utils.py
+Utility functions to load and process data.
 
 """
 
 import logging
 import os
 
+import torch
 import numpy as np
 import pandas as pd
 import torch.utils.data as data
 
 from data.datasets import TweetSentimentDataset, ImdbSentimentDataset
 
+# Set up logging
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -26,25 +25,34 @@ def mkdirs(dirpath):
     except Exception:
         pass
 
+# Load Sentiment 140 dataset
 def load_sentiment_140(traindir, testdir):
     """Load the Twitter Sentiment 140 dataset"""
     train_ds = pd.read_csv(traindir)
     test_ds = pd.read_csv(testdir)
+    train_ds['target'].replace({4:1},inplace=True)
+    test_ds['target'].replace({4:1},inplace=True)
     X_train, y_train = train_ds.cleaned_text, train_ds.target
     X_test, y_test = test_ds.cleaned_text, test_ds.target
 
     return (X_train, y_train, X_test, y_test)
 
+# Load IMDB dataset
 def load_imdb_sentiment(traindir, testdir):
     train_ds = pd.read_csv(traindir)
     test_ds = pd.read_csv(testdir)
+    train_ds['target'].replace({'positive':1},inplace=True)
+    train_ds['target'].replace({'negative':0},inplace=True)
+    test_ds['target'].replace({'positive':1},inplace=True)
+    test_ds['target'].replace({'negative':0},inplace=True)
+
     X_train, y_train = train_ds.cleaned_text, train_ds.target
     X_test, y_test = test_ds.cleaned_text, test_ds.target
 
     return (X_train, y_train, X_test, y_test)
 
-
-def record_net_data_stats(y_train, net_dataidx_map, logdir):
+# Record the data statistics
+def record_net_data_stats(y_train, net_dataidx_map):
     net_cls_counts = {}
 
     for net_i, dataidx in net_dataidx_map.items():
@@ -65,13 +73,13 @@ def record_net_data_stats(y_train, net_dataidx_map, logdir):
 
     return net_cls_counts
 
-
-def partition_data(dataset, traindir, testdir, logdir, partition, n_parties, beta=0.4):
+# Partition the data
+def partition_data(dataset, datadir, partition, n_parties, beta=0.4):
     """Data partitioning to each local party according to the beta distribution"""
     if dataset == "twitter":
-        X_train, y_train, X_test, y_test = load_sentiment_140(traindir, testdir)
+        X_train, y_train, X_test, y_test = load_sentiment_140(datadir+f"{dataset}_train.csv", datadir+f"{dataset}_test.csv")
     elif dataset == "imdb":
-        X_train, y_train, X_test, y_test = load_imdb_sentiment(traindir, testdir)
+        X_train, y_train, X_test, y_test = load_imdb_sentiment(datadir+f"{dataset}_train.csv", datadir+f"{dataset}_test.csv")
 
     n_train = y_train.shape[0]
 
@@ -84,7 +92,7 @@ def partition_data(dataset, traindir, testdir, logdir, partition, n_parties, bet
     elif partition == "noniid":
         min_size = 0
         min_require_size = 10
-        K = 10
+        K = 2
 
         N = y_train.shape[0]
         net_dataidx_map = {}
@@ -105,41 +113,47 @@ def partition_data(dataset, traindir, testdir, logdir, partition, n_parties, bet
             np.random.shuffle(idx_batch[j])
             net_dataidx_map[j] = idx_batch[j]
 
-    traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map, logdir)
+    traindata_cls_counts = record_net_data_stats(y_train, net_dataidx_map)
     return (X_train, y_train, X_test, y_test, net_dataidx_map, traindata_cls_counts)
 
-def get_dataloader(dataset, vocab_file, traindir, testdir, train_bs, test_bs, dataidxs=None):
-    if dataset == "twitter":
+
+def get_accuracy(y_pred,y_actual):
+    """Calculates the accuracy (0 to 1)
+
+    Args:
+    + y_pred (tensor ): output from the model
+    + y_actual (tensor): ground truth 
+
+    Returns:
+    + float: a value between 0 to 1
+    """
+    y_pred = torch.argmax(y_pred, axis=1)
+    return (1/len(y_actual))*torch.sum(torch.round(y_pred)==y_actual)
+
+# Get the dataloader
+def get_dataloader(datadir, batch_size, args, dataidxs=None):
+    if args.dataset == "twitter":
         dl_obj = TweetSentimentDataset
-
-        train_ds = dl_obj(
-            traindir,
-            dataidxs=dataidxs,
-            vocab_file=vocab_file,
-            create_vocab=False
-        )
-
-        test_ds = dl_obj(
-            testdir,
-            vocab_file=vocab_file,
-            create_vocab=False
-        )
-
-        train_dl = data.DataLoader(dataset=train_ds, batch_size=train_bs, drop_last=True, shuffle=True)
-        test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False)
-
-    elif dataset == "imdb":
+    elif args.dataset == "imdb":
         dl_obj = ImdbSentimentDataset
+    else:
+        raise("Invalid Dataset")
 
-        train_ds = dl_obj(
-            traindir,
-            dataidxs=dataidxs,
-        )
+    train_ds = dl_obj(
+        datadir+f"{args.dataset}_train.csv",
+        dataidxs=dataidxs,
+        vocab_file=args.vocab,
+        create_vocab=False
+    )
 
-        test_ds = dl_obj(testdir)
+    test_ds = dl_obj(
+        datadir+f"{args.dataset}_test.csv",
+        vocab_file=args.vocab,
+        create_vocab=False
+    )
 
-        train_dl = data.DataLoader(dataset=train_ds, batch_size=train_bs, drop_last=True, shuffle=True)
-        test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False)
+    train_dl = data.DataLoader(dataset=train_ds, batch_size=batch_size, drop_last=True, shuffle=True)
+    test_dl = data.DataLoader(dataset=test_ds, batch_size=batch_size, shuffle=False)
 
     return (
         train_dl,
