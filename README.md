@@ -92,6 +92,9 @@ For model selection, we utilize the bidirectional LSTM architecture.
 
   ![Hybrid Model cm](plots/cm_imdb_noniid.png)
 
+## Related Projects
+For a similar implementation of federated learning applied to Image Classification, please refer to [this repository](https://github.com/Atul-AI08/Federated-Learning-for-Image-Classification).
+
 # References
 
 - Dataset
